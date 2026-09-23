@@ -29,6 +29,19 @@ impl GestureDetector {
         &self.config
     }
 
+    /// Hard reset: forget all in-progress touches and gesture state.
+    /// Callers that act on a `Recognized` event with a slow follow-up
+    /// (e.g. switching displays, running an animation) should call this
+    /// immediately after acting on it and *before* resuming input reads,
+    /// so a backlog of queued events from the tail end of the same
+    /// physical touch can't be misinterpreted as a new, malformed gesture.
+    pub fn cancel(&mut self) {
+        self.active.clear();
+        self.origin.clear();
+        self.started = false;
+        self.recognized = false;
+    }
+
     /// Feed one raw event, get back zero or one classified gesture events.
     pub fn feed(&mut self, event: RawTouchEvent) -> Option<GestureEvent> {
         match event {
