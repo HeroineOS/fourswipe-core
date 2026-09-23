@@ -104,7 +104,8 @@ impl GestureDetector {
             return None;
         }
 
-        let direction = if dx.abs() >= dy.abs() {
+        let horizontal = dx.abs() >= dy.abs();
+        let direction = if horizontal {
             if dx > 0.0 { SwipeDirection::Right } else { SwipeDirection::Left }
         } else if dy > 0.0 {
             SwipeDirection::Down
@@ -112,7 +113,17 @@ impl GestureDetector {
             SwipeDirection::Up
         };
 
-        if distance >= self.config.recognize_distance {
+        // Screen-relative threshold: only the axis matching the candidate
+        // direction has to clear its fraction-of-screen distance, so a
+        // deliberate mostly-horizontal swipe isn't penalized by a config
+        // tuned differently for vertical (and vice versa).
+        let required = if horizontal {
+            self.config.recognize_distance_x()
+        } else {
+            self.config.recognize_distance_y()
+        };
+
+        if required > 0.0 && dx.abs().max(dy.abs()) >= required {
             self.recognized = true;
             return Some(GestureEvent::Recognized {
                 finger_count: n,
@@ -136,9 +147,19 @@ mod tests {
         TouchPoint { slot, x, y }
     }
 
+    // 1000x1000 "screen" with the default 60% recognize_fraction: a swipe
+    // needs to cover >= 600 units to count.
+    fn test_config() -> GestureConfig {
+        GestureConfig {
+            screen_width: 1000.0,
+            screen_height: 1000.0,
+            ..GestureConfig::default()
+        }
+    }
+
     #[test]
-    fn recognizes_four_finger_right_swipe() {
-        let mut d = GestureDetector::new(GestureConfig::default());
+    fn recognizes_four_finger_right_swipe_covering_most_of_the_screen() {
+        let mut d = GestureDetector::new(test_config());
 
         for slot in 0..4 {
             d.feed(RawTouchEvent::Down(tp(slot, 0.0, 0.0)));
@@ -149,7 +170,7 @@ mod tests {
         );
 
         for slot in 0..4 {
-            d.feed(RawTouchEvent::Move(tp(slot, 100.0, 0.0)));
+            d.feed(RawTouchEvent::Move(tp(slot, 700.0, 0.0)));
         }
         assert_eq!(
             d.feed(RawTouchEvent::Frame),
@@ -161,21 +182,42 @@ mod tests {
     }
 
     #[test]
+    fn small_drag_does_not_recognize() {
+        // Regression: a light touch-and-drag (e.g. a screenshot tool's own
+        // gesture, or an accidental brush) must not trigger a switch just
+        // because 4 fingers happened to be down.
+        let mut d = GestureDetector::new(test_config());
+        for slot in 0..4 {
+            d.feed(RawTouchEvent::Down(tp(slot, 0.0, 0.0)));
+        }
+        d.feed(RawTouchEvent::Frame);
+        for slot in 0..4 {
+            d.feed(RawTouchEvent::Move(tp(slot, 100.0, 0.0)));
+        }
+        // In progress, but nowhere near the 600-unit threshold — must not
+        // be Recognized (or Cancelled).
+        assert!(matches!(
+            d.feed(RawTouchEvent::Frame),
+            Some(GestureEvent::Update { .. }) | None
+        ));
+    }
+
+    #[test]
     fn wrong_finger_count_never_recognizes() {
-        let mut d = GestureDetector::new(GestureConfig::default());
+        let mut d = GestureDetector::new(test_config());
         for slot in 0..3 {
             d.feed(RawTouchEvent::Down(tp(slot, 0.0, 0.0)));
         }
         assert_eq!(d.feed(RawTouchEvent::Frame), None);
         for slot in 0..3 {
-            d.feed(RawTouchEvent::Move(tp(slot, 200.0, 0.0)));
+            d.feed(RawTouchEvent::Move(tp(slot, 900.0, 0.0)));
         }
         assert_eq!(d.feed(RawTouchEvent::Frame), None);
     }
 
     #[test]
     fn lifting_a_finger_mid_swipe_cancels() {
-        let mut d = GestureDetector::new(GestureConfig::default());
+        let mut d = GestureDetector::new(test_config());
         for slot in 0..4 {
             d.feed(RawTouchEvent::Down(tp(slot, 0.0, 0.0)));
         }

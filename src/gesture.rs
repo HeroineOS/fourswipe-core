@@ -54,23 +54,55 @@ pub enum GestureEvent {
 }
 
 /// Tuning knobs for [`crate::detector::GestureDetector`].
+///
+/// Recognition thresholds are screen-relative, not a fixed pixel/unit
+/// distance: a swipe only counts once it covers a large fraction of the
+/// screen, so a light touch-and-drag of a few fingers (e.g. picking up a
+/// screenshot-tool gesture, or an accidental brush) can't be mistaken for
+/// deliberate intent to switch. Callers (backends) are expected to fill in
+/// `screen_width`/`screen_height` from the real touch surface's coordinate
+/// range — the detector itself stays backend-agnostic, it just needs to be
+/// told what "most of the screen" means in whatever units the backend's
+/// `TouchPoint`s use.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct GestureConfig {
     /// Exact number of simultaneous fingers required. HeroineOS's TTY and
     /// OS switching both use 4.
     pub required_fingers: u8,
-    /// Minimum straight-line distance (backend units) before a direction is
-    /// recognized as deliberate rather than noise/jitter.
-    pub recognize_distance: f64,
+    /// Touch surface extent, in the same units as [`TouchPoint`] coordinates
+    /// (e.g. a touchscreen's raw `ABS_MT_POSITION_X`/`Y` range).
+    pub screen_width: f64,
+    pub screen_height: f64,
+    /// Fraction of the relevant screen dimension (width for a
+    /// left/right swipe, height for up/down) a swipe must cover before
+    /// it's recognized as deliberate. 0.5-0.7 is the useful range; default
+    /// is 0.6 (60% of the screen).
+    pub recognize_fraction: f64,
     /// Ignore movement smaller than this per-frame (device noise floor).
     pub jitter_threshold: f64,
+}
+
+impl GestureConfig {
+    pub(crate) fn recognize_distance_x(&self) -> f64 {
+        self.screen_width * self.recognize_fraction
+    }
+
+    pub(crate) fn recognize_distance_y(&self) -> f64 {
+        self.screen_height * self.recognize_fraction
+    }
 }
 
 impl Default for GestureConfig {
     fn default() -> Self {
         Self {
             required_fingers: 4,
-            recognize_distance: 80.0,
+            // Deliberately 0x0: a caller that forgets to fill these in from
+            // real touch-surface geometry gets a config that can never
+            // recognize anything, rather than one that silently uses a
+            // fixed pixel distance meaningless on their device.
+            screen_width: 0.0,
+            screen_height: 0.0,
+            recognize_fraction: 0.6,
             jitter_threshold: 2.0,
         }
     }

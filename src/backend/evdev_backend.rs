@@ -63,6 +63,21 @@ impl EvdevBackend {
         let (_path, device) = find_touchscreen()?;
         Ok(Self::new(device))
     }
+
+    /// The touchscreen's raw coordinate range (max - min) for X and Y, i.e.
+    /// its reported "screen size" in device units. Callers should feed this
+    /// into [`crate::GestureConfig`]'s `screen_width`/`screen_height` so
+    /// recognition thresholds are relative to the actual touch surface
+    /// rather than a fixed, device-meaningless distance.
+    pub fn screen_extent(&self) -> Result<(f64, f64), BackendError> {
+        let abs_state = self.device.get_abs_state().map_err(BackendError::Io)?;
+        let abs_x = &abs_state[AbsoluteAxisType::ABS_MT_POSITION_X.0 as usize];
+        let abs_y = &abs_state[AbsoluteAxisType::ABS_MT_POSITION_Y.0 as usize];
+        Ok((
+            (abs_x.maximum - abs_x.minimum) as f64,
+            (abs_y.maximum - abs_y.minimum) as f64,
+        ))
+    }
 }
 
 impl InputBackend for EvdevBackend {
