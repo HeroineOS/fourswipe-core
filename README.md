@@ -32,7 +32,7 @@ Two layers, kept deliberately decoupled:
 ## Status
 
 Early scaffold — gesture detector is implemented and tested; the evdev
-backend compiles but hasn't been validated against real touchpad hardware
+backend compiles but hasn't been validated against real touchscreen hardware
 yet.
 
 ## License

@@ -1,18 +1,22 @@
-//! Raw evdev backend: reads directly from `/dev/input/eventN`, bypassing
-//! libinput/X11/Wayland entirely. This is what makes four-finger TTY
-//! switching possible — it works with no compositor or display server
-//! running at all, which is exactly the environment a TTY switch happens in.
+//! Raw evdev backend for **touchscreens**: reads directly from
+//! `/dev/input/eventN`, bypassing libinput/X11/Wayland entirely. This is
+//! what makes four-finger TTY switching possible — it works with no
+//! compositor or display server running at all, which is exactly the
+//! environment a TTY switch happens in.
 
 use std::path::PathBuf;
 
-use evdev::{AbsoluteAxisType, Device, EventType, InputEventKind};
+use evdev::{AbsoluteAxisType, Device, EventType, InputEventKind, PropType};
 
 use super::{BackendError, InputBackend};
 use crate::gesture::{RawTouchEvent, TouchPoint};
 
-/// Finds the first input device that looks like a multitouch touchpad
-/// (i.e. it reports `ABS_MT_POSITION_X`/`ABS_MT_POSITION_Y`).
-pub fn find_touchpad() -> Result<(PathBuf, Device), BackendError> {
+/// Finds the first input device that looks like a multitouch **touchscreen**
+/// (reports `ABS_MT_POSITION_X`/`ABS_MT_POSITION_Y` *and* declares
+/// `INPUT_PROP_DIRECT`, the kernel property that distinguishes a direct
+/// touch surface from a touchpad, which instead declares
+/// `INPUT_PROP_POINTER`). This intentionally does NOT match touchpads.
+pub fn find_touchscreen() -> Result<(PathBuf, Device), BackendError> {
     for (path, device) in evdev::enumerate() {
         let supports_mt = device
             .supported_absolute_axes()
@@ -21,7 +25,8 @@ pub fn find_touchpad() -> Result<(PathBuf, Device), BackendError> {
                     && axes.contains(AbsoluteAxisType::ABS_MT_POSITION_Y)
             })
             .unwrap_or(false);
-        if supports_mt {
+        let is_direct_touch = device.properties().contains(PropType::DIRECT);
+        if supports_mt && is_direct_touch {
             return Ok((path, device));
         }
     }
@@ -29,7 +34,7 @@ pub fn find_touchpad() -> Result<(PathBuf, Device), BackendError> {
 }
 
 /// Tracks type-B multitouch protocol state (the `ABS_MT_SLOT` /
-/// `ABS_MT_TRACKING_ID` protocol nearly all modern touchpads use) and
+/// `ABS_MT_TRACKING_ID` protocol nearly all modern touchscreens use) and
 /// translates it into [`RawTouchEvent`]s.
 pub struct EvdevBackend {
     device: Device,
@@ -55,7 +60,7 @@ impl EvdevBackend {
     }
 
     pub fn open_default() -> Result<Self, BackendError> {
-        let (_path, device) = find_touchpad()?;
+        let (_path, device) = find_touchscreen()?;
         Ok(Self::new(device))
     }
 }
