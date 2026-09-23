@@ -1,0 +1,18 @@
+[package]
+name = "swipecore"
+version = "0.1.0"
+edition = "2021"
+description = "Core gesture-detection engine for four-finger swipe (TTY switching, future OS switching, Android/Termux)"
+repository = "https://github.com/HeroineOS/swipecore"
+license = "MIT OR Apache-2.0"
+
+[dependencies]
+thiserror = "1"
+log = "0.4"
+
+[target.'cfg(target_os = "linux")'.dependencies]
+evdev = "0.12"
+
+[features]
+default = ["evdev-backend"]
+evdev-backend = []
