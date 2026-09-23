@@ -1,10 +1,10 @@
-# four-swipe-core
+# fourswipe-core
 
 Backend-agnostic four-finger (and generally N-finger) swipe gesture
 detection engine, part of [HeroineOS](https://github.com/HeroineOS).
 
 Inspired by Huawei laptops' four-finger swipe between Windows and HarmonyOS.
-`four-swipe-core` is the shared recognition engine meant to be reused by:
+`fourswipe-core` is the shared recognition engine meant to be reused by:
 
 - **tty-swipe** (HeroineOS) — swipe between active TTYs with no keybind held
 - a future **os-swipe** (HeroineOS) — swipe between two running OSes without VM software (design not yet started)

@@ -1,9 +1,9 @@
 [package]
-name = "four-swipe-core"
+name = "fourswipe-core"
 version = "0.1.0"
 edition = "2021"
 description = "Core gesture-detection engine for four-swipe (TTY switching, future OS switching, Android/Termux)"
-repository = "https://github.com/HeroineOS/four-swipe-core"
+repository = "https://github.com/HeroineOS/fourswipe-core"
 license = "MIT OR Apache-2.0"
 
 [dependencies]
