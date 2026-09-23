@@ -75,8 +75,8 @@ pub struct GestureConfig {
     pub screen_height: f64,
     /// Fraction of the relevant screen dimension (width for a
     /// left/right swipe, height for up/down) a swipe must cover before
-    /// it's recognized as deliberate. 0.5-0.7 is the useful range; default
-    /// is 0.6 (60% of the screen).
+    /// it's recognized as deliberate. 0.4-0.7 is the useful range; default
+    /// is 0.4 (40% of the screen).
     pub recognize_fraction: f64,
     /// Ignore movement smaller than this per-frame (device noise floor).
     pub jitter_threshold: f64,
@@ -102,7 +102,7 @@ impl Default for GestureConfig {
             // fixed pixel distance meaningless on their device.
             screen_width: 0.0,
             screen_height: 0.0,
-            recognize_fraction: 0.6,
+            recognize_fraction: 0.4,
             jitter_threshold: 2.0,
         }
     }

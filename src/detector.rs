@@ -160,8 +160,8 @@ mod tests {
         TouchPoint { slot, x, y }
     }
 
-    // 1000x1000 "screen" with the default 60% recognize_fraction: a swipe
-    // needs to cover >= 600 units to count.
+    // 1000x1000 "screen" with the default 40% recognize_fraction: a swipe
+    // needs to cover >= 400 units to count.
     fn test_config() -> GestureConfig {
         GestureConfig {
             screen_width: 1000.0,
@@ -207,7 +207,7 @@ mod tests {
         for slot in 0..4 {
             d.feed(RawTouchEvent::Move(tp(slot, 100.0, 0.0)));
         }
-        // In progress, but nowhere near the 600-unit threshold — must not
+        // In progress, but nowhere near the 400-unit threshold — must not
         // be Recognized (or Cancelled).
         assert!(matches!(
             d.feed(RawTouchEvent::Frame),
