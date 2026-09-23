@@ -12,6 +12,9 @@ pub struct GestureDetector {
     origin: HashMap<i32, TouchPoint>,
     started: bool,
     recognized: bool,
+    /// Set by `cancel()`: ignore everything until the fingers of the
+    /// cancelled touch have lifted.
+    suppressed: bool,
 }
 
 impl GestureDetector {
@@ -22,6 +25,7 @@ impl GestureDetector {
             origin: HashMap::new(),
             started: false,
             recognized: false,
+            suppressed: false,
         }
     }
 
@@ -29,21 +33,36 @@ impl GestureDetector {
         &self.config
     }
 
-    /// Hard reset: forget all in-progress touches and gesture state.
-    /// Callers that act on a `Recognized` event with a slow follow-up
-    /// (e.g. switching displays, running an animation) should call this
-    /// immediately after acting on it and *before* resuming input reads,
-    /// so a backlog of queued events from the tail end of the same
-    /// physical touch can't be misinterpreted as a new, malformed gesture.
+    /// Hard reset: forget all in-progress touches and gesture state, and
+    /// ignore input until the fingers currently down have lifted. Call this
+    /// right after acting on a `Recognized` gesture so the rest of the same
+    /// physical touch can't start (or be read as) another gesture.
     pub fn cancel(&mut self) {
         self.active.clear();
         self.origin.clear();
         self.started = false;
         self.recognized = false;
+        self.suppressed = true;
     }
 
     /// Feed one raw event, get back zero or one classified gesture events.
     pub fn feed(&mut self, event: RawTouchEvent) -> Option<GestureEvent> {
+        if self.suppressed {
+            // Track the still-down fingers only to notice when they're gone.
+            match event {
+                RawTouchEvent::Down(tp) | RawTouchEvent::Move(tp) => {
+                    self.active.insert(tp.slot, tp);
+                }
+                RawTouchEvent::Up { slot } => {
+                    self.active.remove(&slot);
+                    if self.active.is_empty() {
+                        self.suppressed = false;
+                    }
+                }
+                RawTouchEvent::Frame => {}
+            }
+            return None;
+        }
         match event {
             RawTouchEvent::Down(tp) => {
                 self.active.insert(tp.slot, tp);
@@ -226,6 +245,34 @@ mod tests {
             d.feed(RawTouchEvent::Move(tp(slot, 900.0, 0.0)));
         }
         assert_eq!(d.feed(RawTouchEvent::Frame), None);
+    }
+
+    #[test]
+    fn rest_of_a_cancelled_touch_is_ignored() {
+        let mut d = GestureDetector::new(test_config());
+        for slot in 0..4 {
+            d.feed(RawTouchEvent::Down(tp(slot, 0.0, 0.0)));
+        }
+        d.feed(RawTouchEvent::Frame);
+        d.cancel();
+
+        // Same fingers keep moving: no new Start / Recognized.
+        for slot in 0..4 {
+            d.feed(RawTouchEvent::Move(tp(slot, 900.0, 0.0)));
+        }
+        assert_eq!(d.feed(RawTouchEvent::Frame), None);
+
+        for slot in 0..4 {
+            d.feed(RawTouchEvent::Up { slot });
+        }
+        // Fresh touch works again.
+        for slot in 0..4 {
+            d.feed(RawTouchEvent::Down(tp(slot, 0.0, 0.0)));
+        }
+        assert_eq!(
+            d.feed(RawTouchEvent::Frame),
+            Some(GestureEvent::Start { finger_count: 4 })
+        );
     }
 
     #[test]
